@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -30,6 +32,9 @@ import com.tutorapp.webapp.User.Repository.UserInfoDao;
 
 @RestController
 public class RatingController {
+
+    private static final Logger log = LoggerFactory.getLogger(RatingController.class);
+
     @Autowired
     private RatingDao ratingDao;
 
@@ -70,8 +75,7 @@ public ResponseEntity<Double> getAverageRating(@PathVariable String teacherUsern
                     }
 
                     Long teacherId = teacher.get().getId();
-                    System.out.println("Teacher ID: " + teacherId); // Debugging 
-                        List<Rating> ratings = ratingDao.findByRateeId(teacherId);
+                    List<Rating> ratings = ratingDao.findByRateeId(teacherId);
                         if (ratings == null) ratings = new ArrayList<>();
 
                         Double avg = ratings.stream()

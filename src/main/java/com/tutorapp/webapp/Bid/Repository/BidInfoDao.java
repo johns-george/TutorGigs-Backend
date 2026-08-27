@@ -1,8 +1,9 @@
 package com.tutorapp.webapp.Bid.Repository;
 
 import java.util.List;
-//import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -15,9 +16,11 @@ import com.tutorapp.webapp.Bid.Entity.BidInfo;
 import jakarta.transaction.Transactional;
 
 @Repository
-public interface  BidInfoDao  extends JpaRepository<BidInfo, Long>{
+public interface BidInfoDao extends JpaRepository<BidInfo, Long>{
 
     List<BidInfo> findByStudentId(Long studentId);
+
+    Page<BidInfo> findByStudentId(Long studentId, Pageable pageable);
 
     List<BidInfo> findByGigdata_IdAndStatus(Long gigId, String status);
 
@@ -27,11 +30,17 @@ public interface  BidInfoDao  extends JpaRepository<BidInfo, Long>{
 
     void deleteByGigdata_IdAndStudent_Id(Long gigId, long id);
 
+    boolean existsByGigdata_IdAndStudent_Id(Long gigId, Long studentId);
+
     void deleteByGigdata_Id(Long gigId);
 
     @EntityGraph(attributePaths = {"gigdata", "student"})
     @Query("SELECT b FROM BidInfo b where b.gigdata.teacherUsername = :teacherUsername")
     List<BidInfo> getRequestsByTeacherUsername(String teacherUsername);
+
+    @EntityGraph(attributePaths = {"gigdata", "student"})
+    @Query("SELECT b FROM BidInfo b where b.gigdata.teacherUsername = :teacherUsername")
+    Page<BidInfo> getRequestsByTeacherUsername(String teacherUsername, Pageable pageable);
 
     @Modifying
     @Transactional

@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,29 +28,29 @@ public class WishlistController {
 
 
     @PostMapping("/addwishlist")
-    public String addwishlist(@RequestBody WishlistRequestDTO request, Authentication authentication) {
-          if(authentication != null && authentication.isAuthenticated()) {
-            System.out.println("request: " + request);
-              wishlistService.addToWishlist(request.getGigId(), request.getUserId());
-          }
-           return "Added to wishlist";
+    public ResponseEntity<?> addwishlist(@RequestBody WishlistRequestDTO request, Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
+        wishlistService.addToWishlist(request.getGigId(), request.getUserId());
+        return ResponseEntity.ok("Added to wishlist");
+    }
 
-        @GetMapping("/getwishlist")
-        public List<WishlistResponseDTO> getWishlist(Authentication authentication) {
-              if(authentication != null && authentication.isAuthenticated()) {
-                  String username = authentication.getName();
-                  return wishlistService.getWishlistByUsername(username);
-              }
-              return null;
+    @GetMapping("/getwishlist")
+    public ResponseEntity<?> getWishlist(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
+        String username = authentication.getName();
+        return ResponseEntity.ok(wishlistService.getWishlistByUsername(username));
+    }
 
-        @DeleteMapping("/removewishlist")
-        public String removewishlist(@RequestBody Map<String, Long> request, Authentication authentication) {
-              if(authentication != null && authentication.isAuthenticated()) {
-                  wishlistService.removeFromWishlist(request.get("gigId"), request.get("userId"));
-              }
-              return "Removed from wishlist";
-
-            }
+    @DeleteMapping("/removewishlist")
+    public ResponseEntity<?> removewishlist(@RequestBody Map<String, Long> request, Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
         }
+        wishlistService.removeFromWishlist(request.get("gigId"), request.get("userId"));
+        return ResponseEntity.ok("Removed from wishlist");
+    }
+}

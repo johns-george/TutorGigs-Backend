@@ -12,10 +12,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.tutorapp.webapp.Auth.DTO.LoginRequest;
 import com.tutorapp.webapp.Auth.Service.LoginService;
 import com.tutorapp.webapp.Auth.Service.PasswordCryptoService;
+import com.tutorapp.webapp.Auth.Service.TokenBlacklistService;
 import com.tutorapp.webapp.Common.Utils.JwtUtil;
 import com.tutorapp.webapp.User.Entity.UserInfo;
+
+import jakarta.validation.Valid;
 
 
 @RestController
@@ -31,25 +35,28 @@ public class LoginController {
     @Autowired
     PasswordCryptoService passwordCryptoService;
 
+    @Autowired
+    TokenBlacklistService tokenBlacklistService;
+
     @GetMapping("/password-key")
     public ResponseEntity<Map<String, String>> getPasswordKey() {
         return ResponseEntity.ok(passwordCryptoService.getPublicKeyPayload());
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@RequestBody UserInfo userinfo) {
+    public ResponseEntity<Map<String, Object>> login(@Valid @RequestBody LoginRequest request) {
         Map<String, Object> response = new HashMap<>();
         String password;
 
         try {
-            password = passwordCryptoService.decryptPassword(userinfo.getEncryptedPassword(), userinfo.getPasswordKeyId());
+            password = passwordCryptoService.decryptPassword(request.getEncryptedPassword(), request.getPasswordKeyId());
         } catch (IllegalArgumentException e) {
             response.put("success", false);
             response.put("message", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
 
-        UserInfo user = loginService.validateUser(userinfo.getUsername(), password);
+        UserInfo user = loginService.validateUser(request.getUsername(), password);
 
     if (user != null) {
         String accessToken = jwtUtil.generateAccessToken(user.getUsername(), user.getRole());
@@ -67,8 +74,19 @@ public class LoginController {
         response.put("message", "Invalid username or password");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
-}
-@PostMapping("/refresh")
+}    @PostMapping("/logout")
+    public ResponseEntity<Map<String, Object>> logout(@RequestBody Map<String, String> request) {
+        String token = request.get("accessToken");
+        Map<String, Object> response = new HashMap<>();
+        if (token != null && !token.isBlank()) {
+            tokenBlacklistService.blacklistToken(token);
+        }
+        response.put("success", true);
+        response.put("message", "Logged out successfully");
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/refresh")
 public ResponseEntity<Map<String, Object>> refreshToken(@RequestBody Map<String, String> request) {
     String refreshToken = request.get("refreshToken");
     Map<String, Object> response = new HashMap<>();

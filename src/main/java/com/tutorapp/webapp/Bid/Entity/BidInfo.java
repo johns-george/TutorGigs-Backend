@@ -120,8 +120,4 @@ public class BidInfo {
     public void setStatus(String status) {
         this.status = status;
     }
-
-    // public void setGigId(Long gigId) {
-    //     this.gigId = gigId;
-    // }
 }

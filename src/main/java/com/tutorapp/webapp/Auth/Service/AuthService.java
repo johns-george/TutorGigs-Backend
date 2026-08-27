@@ -1,15 +1,17 @@
 package com.tutorapp.webapp.Auth.Service;
 
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
 
 import com.tutorapp.webapp.Common.Services.EmailService;
 import com.tutorapp.webapp.User.Entity.UserInfo;
 import com.tutorapp.webapp.User.Repository.UserInfoDao;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import java.util.Optional;
-import java.util.UUID;
 
 
 @Service
@@ -21,6 +23,12 @@ public class AuthService {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Value("${FRONTEND_URL:http://localhost:5173}")
+    private String frontendUrl;
+
     // Handle forgot password
     public String forgotPassword(String email) {
         Optional<UserInfo> optionalUser = userRepository.findByEmail(email);
@@ -31,10 +39,10 @@ public class AuthService {
         UserInfo user = optionalUser.get();
         String token = UUID.randomUUID().toString();
         user.setResetToken(token);
+        user.setResetTokenExpiry(LocalDateTime.now().plusHours(1));
         userRepository.save(user);
 
-        // In real project, generate link to your frontend reset page
-        String resetLink = "http://localhost:3000/reset-password?token=" + token;
+        String resetLink = frontendUrl + "/reset-password?token=" + token;
 
         emailService.sendEmail(email, "Password Reset Request",
                 "Click the link below to reset your password:\n" + resetLink);
@@ -50,9 +58,13 @@ public class AuthService {
         }
 
         UserInfo user = optionalUser.get();
-       BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-       user.setPassword(passwordEncoder.encode(newPassword));
+        if (user.getResetTokenExpiry() == null || user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Reset token has expired. Please request a new one.");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
         user.setResetToken(null);
+        user.setResetTokenExpiry(null);
         userRepository.save(user);
 
         return "Password reset successful.";

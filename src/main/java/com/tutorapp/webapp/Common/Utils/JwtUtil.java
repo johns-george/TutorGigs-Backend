@@ -6,6 +6,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.tutorapp.webapp.User.Enum.Role;
@@ -13,19 +16,37 @@ import com.tutorapp.webapp.User.Enum.Role;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 
 @Component
 public class JwtUtil {
 
-    // 🔐 Use a secure, random 256-bit key (keep this private)
-    private static final Key SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+    private static final Logger log = LoggerFactory.getLogger(JwtUtil.class);
+
+    @Value("${JWT_SECRET:}")
+    private String jwtSecretEnv;
+
+    private Key SECRET_KEY;
 
     // Access token validity: 15 minutes
-    private static final long ACCESS_TOKEN_EXPIRATION = 1000 * 30 ;
+    private static final long ACCESS_TOKEN_EXPIRATION = 1000 * 60 * 15;
 
     // Refresh token validity: 7 days
     private static final long REFRESH_TOKEN_EXPIRATION = 1000 * 60 * 60 * 24 * 7;
+
+    @PostConstruct
+    public void init() {
+        if (jwtSecretEnv != null && !jwtSecretEnv.isBlank()) {
+            byte[] keyBytes = Decoders.BASE64.decode(jwtSecretEnv);
+            this.SECRET_KEY = Keys.hmacShaKeyFor(keyBytes);
+            log.info("JWT secret key loaded from environment variable");
+        } else {
+            log.warn("JWT_SECRET not set — using generated key. Tokens will not survive restarts.");
+            this.SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+        }
+    }
 
     // ✅ Generate Access Token
     public String generateAccessToken(String username, Role role) {

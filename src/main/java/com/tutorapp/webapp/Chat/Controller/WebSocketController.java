@@ -22,7 +22,6 @@ SimpMessagingTemplate messagingTemplate;
 @MessageMapping("/chat.sendMessage")
 public void sendMessage(ChatMessageDTO messageDTO) {
     // Save message to DB
-     //System.out.println("message :" + messageDTO.receiverId);
      var savedMessage = messageService.saveMessage(
         messageDTO.getChatId(),
         messageDTO.getSenderId(),

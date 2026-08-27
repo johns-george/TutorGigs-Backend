@@ -18,32 +18,28 @@ import com.tutorapp.webapp.User.Repository.UserInfoDao;
 public class StudentDetailsController {
     @Autowired
     UserInfoDao userInfoDao;
- @GetMapping("/student/{studentUsername}")
-    public ResponseEntity<?> getTeacherInfo(@PathVariable String studentUsername, Authentication authentication) {
-        try {
-            if (authentication != null && authentication.isAuthenticated()) {
-                String username = (String) authentication.getPrincipal();
-                System.out.println("Authenticated user: " + username);
-                UserInfo student = userInfoDao.findByUsername(studentUsername)
-                        .orElseThrow(() -> new RuntimeException("Student not found"));
-                         System.out.println("Student info: " + student.toString());
 
-                UserDetailsDTO dto = new UserDetailsDTO();
-                dto.setBio(student.getBio());
-                dto.setDateOfBirth(student.getDateOfBirth());
-                dto.setEmail(student.getEmail());
-                dto.setFullName(student.getFullName());
-                dto.setGrade(student.getGrade());
-                dto.setMobile(student.getMobile());
-                dto.setUsername(student.getUsername());
-                dto.setProfileImageUrl(student.getProfileImageUrl());
-                return ResponseEntity.ok(dto);
-            } else {
+    @GetMapping("/student/{studentUsername}")
+    public ResponseEntity<?> getStudentInfo(@PathVariable String studentUsername, Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
+            UserInfo student = userInfoDao.findByUsername(studentUsername)
+                    .orElseThrow(() -> new RuntimeException("Student not found"));
+
+            UserDetailsDTO dto = new UserDetailsDTO();
+            dto.setBio(student.getBio());
+            dto.setDateOfBirth(student.getDateOfBirth());
+            dto.setEmail(student.getEmail());
+            dto.setFullName(student.getFullName());
+            dto.setGrade(student.getGrade());
+            dto.setMobile(student.getMobile());
+            dto.setUsername(student.getUsername());
+            dto.setProfileImageUrl(student.getProfileImageUrl());
+            return ResponseEntity.ok(dto);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 }

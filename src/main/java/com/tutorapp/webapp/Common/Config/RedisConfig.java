@@ -13,7 +13,10 @@ import org.springframework.data.redis.listener.adapter.MessageListenerAdapter;
 
 import com.tutorapp.webapp.Chat.Redis.RedisSubscriber;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+
 @Configuration
+@ConditionalOnProperty(name = "spring.data.redis.host")
 public class RedisConfig {
 
     @Value("${spring.data.redis.host:localhost}")

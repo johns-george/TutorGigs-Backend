@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -19,6 +20,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import com.tutorapp.webapp.Common.Utils.JwtAuthFilter;
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 
 public class SecurityConfig {
 
@@ -48,6 +50,7 @@ public class SecurityConfig {
                 .requestMatchers("/uploads/**").permitAll() // allow public access to images
                 .requestMatchers("/api/forgot/**").permitAll()
                 .requestMatchers("/api/auth/refresh").permitAll()
+                .requestMatchers("/api/health").permitAll()
                 .anyRequest().authenticated()
                 );
         http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

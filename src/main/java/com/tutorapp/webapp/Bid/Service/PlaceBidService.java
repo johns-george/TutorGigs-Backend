@@ -3,6 +3,8 @@ package com.tutorapp.webapp.Bid.Service;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import com.tutorapp.webapp.Bid.Entity.BidInfo;
@@ -26,6 +28,10 @@ public class PlaceBidService {
 
     public List<BidInfo> getRequestsByTeacherId(String teacherUsername) {
         return bidInfoDao.getRequestsByTeacherUsername(teacherUsername);
+    }
+
+    public Page<BidInfo> getRequestsByTeacherId(String teacherUsername, Pageable pageable) {
+        return bidInfoDao.getRequestsByTeacherUsername(teacherUsername, pageable);
     }
 
      public void updateBidStatus(Long bidId, String status) {

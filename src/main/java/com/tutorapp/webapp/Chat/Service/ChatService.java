@@ -3,7 +3,10 @@ package com.tutorapp.webapp.Chat.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 import com.tutorapp.webapp.Chat.DTO.ChatDTO;
@@ -23,7 +26,10 @@ import com.tutorapp.webapp.User.Repository.UserInfoDao;
 @Service
 public class ChatService {
 
-    @Autowired
+    private static final Logger log = LoggerFactory.getLogger(ChatService.class);
+
+    @Autowired(required = false)
+    @Nullable
     RedisPublisher redisPublisher;
 
     @Autowired
@@ -88,7 +94,9 @@ public class ChatService {
         dto.setContent(msg.getContent());
         dto.setSentAt(msg.getTimestamp().toString());
 
-         redisPublisher.publish(dto);
+         if (redisPublisher != null) {
+            redisPublisher.publish(dto);
+        }
 
         return dto;
     }
@@ -137,7 +145,7 @@ public class ChatService {
             chat.setType(ChatType.PRIVATE);
             chat.setCreatedAt(LocalDateTime.now());
             chat = chatDao.save(chat);
-            System.out.println("Creating new private chat between users " + user1Id + " and " + user2Id);
+            log.debug("Creating new private chat between users {} and {}", user1Id, user2Id);
 
             UserInfo user1 = userInfoDao.findById(user1Id)
                     .orElseThrow(() -> new RuntimeException("User not found"));

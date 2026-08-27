@@ -3,7 +3,11 @@ package com.tutorapp.webapp.Gig.Controller;
 import java.util.List;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -17,6 +21,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.tutorapp.webapp.Bid.Entity.BidInfo;
+import com.tutorapp.webapp.Bid.Repository.BidInfoDao;
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.tutorapp.webapp.Bid.Service.PlaceBidService;
 import com.tutorapp.webapp.Gig.DTO.GigDataDTO;
 import com.tutorapp.webapp.Gig.Entity.GigData;
@@ -28,7 +34,10 @@ import com.tutorapp.webapp.Gig.Service.GigService;
 @RestController
 @RequestMapping("/api/auth")
 public class myGigController {
-      @Autowired
+
+    private static final Logger log = LoggerFactory.getLogger(myGigController.class);
+
+    @Autowired
     GigService gigService;
 
     @Autowired
@@ -37,104 +46,114 @@ public class myGigController {
     @Autowired
     GigDataDao gigDataDao;
 
+    @Autowired
+    BidInfoDao bidInfoDao;
 
-@GetMapping("/my-gigs")
+
+@PreAuthorize("hasRole('TUTOR')")
+    @GetMapping("/my-gigs")
     public ResponseEntity<List<GigDataDTO>> gigData(Authentication authentication) {
         try {
-            if (authentication != null && authentication.isAuthenticated()) {
-            String username = (String) authentication.getPrincipal(); // 👈 username from JWT
-            System.out.println("Authenticated user: " + username);
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            String username = (String) authentication.getPrincipal();
             List<GigDataDTO> gigs = gigService.getGigDataByTeacherUsername(username);
-            System.out.println("Gigs found: " + gigs.size());
             return ResponseEntity.ok(gigs);
-        } else {
-            System.out.println("No authenticated user found");
-           return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-            
-        } 
-        catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(null);
-        }
-        
-    }
-    @GetMapping("/requests/{teacherUsername}")
-    public ResponseEntity<List<BidInfo>> getRequestsByTeacherId(@PathVariable String teacherUsername, Authentication authentication) {
-        try {
-             System.out.println("Teacher username received: " + teacherUsername);
-            if (authentication != null && authentication.isAuthenticated()) {
-                String username = (String) authentication.getPrincipal();
-                System.out.println("Authenticated user: " + username);
-                List<BidInfo> requests = placeBidService.getRequestsByTeacherId(teacherUsername);
-                System.out.println(requests.toString());
-                return ResponseEntity.ok(requests);
-            } else {
-                System.out.println("No authenticated user found");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-            }
-        } catch (Exception e) {
-             //e.printStackTrace(); 
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(null);
-        }
-    }
-    @PutMapping("bids/{bidId}/status")
-    public ResponseEntity<String> updateBidStatus(@PathVariable Long bidId, @RequestParam String status,Authentication authentication) {
-       try {
-       if (authentication != null && authentication.isAuthenticated()) 
-       {
-          placeBidService.updateBidStatus(bidId, status);
-       return ResponseEntity.ok("Bid status updated to " + status);
-        } else {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
-        }
-       }catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error updating bid status: " + e.getMessage());
-        }
-
-    }
-        @DeleteMapping("/delete-gigs/{gigId}")
-    public ResponseEntity<String> deleteGig(@PathVariable Long gigId, Authentication authentication) {
-        try {
-            if (authentication != null && authentication.isAuthenticated()) {
-                String username = (String) authentication.getPrincipal();
-                System.out.println("Authenticated user: " + username);
-                gigService.deleteGig(gigId);
-                return ResponseEntity.ok("Gig deleted successfully");
-            } else {
-                System.out.println("No authenticated user found");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
-            }
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error deleting gig: " + e.getMessage());
-        }
-    }
-    @GetMapping("/gigs/{gigId}")
-    public ResponseEntity<Optional<GigData>> getGigById(@PathVariable Long gigId, Authentication authentication) {
-        try {
-            if (authentication != null && authentication.isAuthenticated()) {
-                String username = (String) authentication.getPrincipal();
-                System.out.println("Authenticated user: " + username);
-                Optional<GigData> gig = gigDataDao.findById(gigId);
-                return ResponseEntity.ok(gig);
-            } else {
-                System.out.println("No authenticated user found");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-            }
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
+    @PreAuthorize("hasRole('TUTOR')")
+    @GetMapping("/requests/{teacherUsername}")
+    public ResponseEntity<?> getRequestsByTeacherId(
+            @PathVariable String teacherUsername,
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            Pageable pageable = PageRequest.of(page, size);
+            return ResponseEntity.ok(placeBidService.getRequestsByTeacherId(teacherUsername, pageable));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+    @PreAuthorize("hasRole('TUTOR')")
+    @PutMapping("bids/{bidId}/status")
+    public ResponseEntity<String> updateBidStatus(@PathVariable Long bidId, @RequestParam String status, Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+            }
+            String username = (String) authentication.getPrincipal();
+            BidInfo bid = bidInfoDao.findById(bidId)
+                    .orElseThrow(() -> new RuntimeException("Bid not found"));
+            if (bid.getGigdata() == null || !bid.getGigdata().getTeacherUsername().equals(username)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You can only update bids on your own gigs");
+            }
+            placeBidService.updateBidStatus(bidId, status);
+            return ResponseEntity.ok("Bid status updated to " + status);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error updating bid status: " + e.getMessage());
+        }
+    }
+        @PreAuthorize("hasRole('TUTOR')")
+    @DeleteMapping("/delete-gigs/{gigId}")
+    public ResponseEntity<String> deleteGig(@PathVariable Long gigId, Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+            }
+            String username = (String) authentication.getPrincipal();
+            GigData gig = gigDataDao.findById(gigId)
+                    .orElseThrow(() -> new RuntimeException("Gig not found"));
+            if (!gig.getTeacherUsername().equals(username)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You can only delete your own gigs");
+            }
+            gigService.deleteGig(gigId);
+            return ResponseEntity.ok("Gig deleted successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error deleting gig: " + e.getMessage());
+        }
+    }
+    @PreAuthorize("hasRole('TUTOR')")
+    @GetMapping("/gigs/{gigId}")
+    public ResponseEntity<Optional<GigData>> getGigById(@PathVariable Long gigId, Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            Optional<GigData> gig = gigDataDao.findById(gigId);
+            return ResponseEntity.ok(gig);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+    @PreAuthorize("hasRole('TUTOR')")
     @PutMapping("edit-gigs/{gigId}")
-    public String putMethodName(@PathVariable Long gigId, @RequestBody GigData gigdata) {
-      GigData updatedgig = gigDataDao.findById(gigId).orElseThrow();
-      updatedgig.setSubject(gigdata.getSubject());
-      updatedgig.setAmount(gigdata.getAmount());
-      updatedgig.setDescription(gigdata.getDescription());
-      updatedgig.setGrade(gigdata.getGrade());
-      updatedgig.setSyllabus(gigdata.getSyllabus());
-      gigDataDao.save(updatedgig);
-      return "Gig updated successfully";
+    public ResponseEntity<String> editGig(@PathVariable Long gigId, @RequestBody GigData gigdata, Authentication authentication) {
+        try {
+            if (authentication == null || !authentication.isAuthenticated()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+            }
+            String username = (String) authentication.getPrincipal();
+            GigData updatedgig = gigDataDao.findById(gigId)
+                    .orElseThrow(() -> new RuntimeException("Gig not found"));
+            if (!updatedgig.getTeacherUsername().equals(username)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You can only edit your own gigs");
+            }
+            updatedgig.setSubject(gigdata.getSubject());
+            updatedgig.setAmount(gigdata.getAmount());
+            updatedgig.setDescription(gigdata.getDescription());
+            updatedgig.setGrade(gigdata.getGrade());
+            updatedgig.setSyllabus(gigdata.getSyllabus());
+            gigDataDao.save(updatedgig);
+            return ResponseEntity.ok("Gig updated successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error updating gig: " + e.getMessage());
+        }
     }
 }

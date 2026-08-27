@@ -2,6 +2,8 @@ package com.tutorapp.webapp.Gig.Service;
 
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,6 +22,8 @@ import jakarta.transaction.Transactional;
 
 @Service
 public class GigService {
+
+    private static final Logger log = LoggerFactory.getLogger(GigService.class);
      
     @Autowired
     GigDataDao gigDataDao;
@@ -34,7 +38,7 @@ public class GigService {
     WishlistDao wishlistDao;
 
     public Page<Object> getGigData(Pageable pageable) {
-         Page<GigData> gigs = gigDataDao.findAll(pageable);
+        Page<GigData> gigs = gigDataDao.findAllWithBids(pageable);
 
         return gigs.map(gig -> {
             GigDataDTO dto = new GigDataDTO();
@@ -46,23 +50,20 @@ public class GigService {
             dto.setAmount(gig.getAmount());
             dto.setRating(gig.getRating());
             dto.setDescription(gig.getDescription());
-        List<BidInfo> acceptedBids = bidInfoDao.findByGigdata_IdAndStatus(gig.getId(), "ACCEPTED");
 
-        // Fetch student full names
-        List<String> studentNames = acceptedBids.stream()
-                .map(bid -> bid.getStudent().getFullName()) // we already have UserInfo object
-                .toList();
+            // Filter accepted bids from eagerly loaded collection (no extra query)
+            List<String> studentNames = gig.getBids().stream()
+                    .filter(bid -> "ACCEPTED".equals(bid.getStatus()))
+                    .map(bid -> bid.getStudent() != null ? bid.getStudent().getFullName() : "Unknown")
+                    .toList();
 
-        dto.setStudentsAccepted(studentNames.size());
-        dto.setAcceptedStudentNames(studentNames);
+            dto.setStudentsAccepted(studentNames.size());
+            dto.setAcceptedStudentNames(studentNames);
 
-            // Fetch teacher full name
-            String teacherFullName = userInfoDao.findByUsername(gig.getTeacherUsername())
-                                                .map(UserInfo::getFullName)
-                                                .orElse("Unknown");
-            String profileImageurl=userInfoDao.findByUsername(gig.getTeacherUsername()).map(UserInfo::getProfileImageUrl).orElse("NA");
-            dto.setTeacherFullName(teacherFullName);
-            dto.setProfileImageUrl(profileImageurl);
+            // Single query for teacher info instead of two
+            UserInfo teacherInfo = userInfoDao.findByUsername(gig.getTeacherUsername()).orElse(null);
+            dto.setTeacherFullName(teacherInfo != null ? teacherInfo.getFullName() : "Unknown");
+            dto.setProfileImageUrl(teacherInfo != null ? teacherInfo.getProfileImageUrl() : "NA");
 
             return dto;
         });
@@ -92,7 +93,6 @@ public class GigService {
         dto.setStudentsAccepted(studentNames.size());
         dto.setAcceptedStudentNames(studentNames);
 
-        System.out.println("GigDataDTO built for " + username + ": " + dto.getId());
         return dto;
     }).toList();
 }

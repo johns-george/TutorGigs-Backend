@@ -1,6 +1,7 @@
 package com.tutorapp.webapp.User.Entity;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,6 +40,7 @@ public class UserInfo {
     private String profileImageUrl;
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String resetToken; // for password reset
+    private LocalDateTime resetTokenExpiry;
 
 
     @OneToMany(mappedBy = "student", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -202,6 +204,14 @@ public void setPasswordKeyId(String passwordKeyId) {
 
     public void setResetToken(String resetToken) {
         this.resetToken = resetToken;
+    }
+
+    public LocalDateTime getResetTokenExpiry() {
+        return resetTokenExpiry;
+    }
+
+    public void setResetTokenExpiry(LocalDateTime resetTokenExpiry) {
+        this.resetTokenExpiry = resetTokenExpiry;
     }
 
 }
