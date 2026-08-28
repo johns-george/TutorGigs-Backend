@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import com.tutorapp.webapp.Auth.Entity.PasswordKey;
 import com.tutorapp.webapp.Auth.Repository.PasswordKeyRepository;
+import com.tutorapp.webapp.Common.Exceptions.BadRequestException;
 
 @Service
 public class PasswordCryptoService {
@@ -77,10 +78,10 @@ public class PasswordCryptoService {
 
     public String decryptPassword(String encryptedPassword, String passwordKeyId) {
         if (encryptedPassword == null || encryptedPassword.isBlank()) {
-            throw new IllegalArgumentException("Encrypted password is required");
+            throw new BadRequestException("Encrypted password is required");
         }
         if (passwordKeyId == null || !keyId.equals(passwordKeyId)) {
-            throw new IllegalArgumentException("Password encryption key is expired");
+            throw new BadRequestException("Password encryption key is expired");
         }
 
         try {
@@ -94,7 +95,7 @@ public class PasswordCryptoService {
             byte[] decrypted = cipher.doFinal(Base64.getDecoder().decode(encryptedPassword));
             return new String(decrypted, StandardCharsets.UTF_8);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Unable to decrypt password", e);
+            throw new BadRequestException("Unable to decrypt password", e);
         }
     }
 }

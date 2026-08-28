@@ -74,6 +74,7 @@ public ResponseEntity<Page<Object>> gigData(
     @GetMapping("/gigs/search")
     public ResponseEntity<Page<Object>> searchGigs(
             Authentication authentication,
+            @RequestParam(required = false) String search,
             @RequestParam(required = false) String subject,
             @RequestParam(required = false) Integer minGrade,
             @RequestParam(required = false) Integer maxGrade,
@@ -86,7 +87,7 @@ public ResponseEntity<Page<Object>> gigData(
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
             }
             Pageable pageable = PageRequest.of(page, size);
-            Page<GigData> gigs = gigDataDao.searchGigs(subject, minGrade, maxGrade, minAmount, maxAmount, pageable);
+            Page<GigData> gigs = gigDataDao.searchGigs(search, subject, minGrade, maxGrade, minAmount, maxAmount, pageable);
             Page<Object> dtoPage = gigs.map(gig -> {
                 GigDataDTO dto = new GigDataDTO();
                 dto.setId(gig.getId());
@@ -176,15 +177,14 @@ public ResponseEntity<Page<Object>> gigData(
             UserInfo teacher = userInfoDao.findByUsername(teacherusername)
                     .orElseThrow(() -> new RuntimeException("Teacher not found"));
             UserDetailsDTO dto = new UserDetailsDTO();
-            dto.setBio(teacher.getBio());
-            dto.setExperience(teacher.getExperience());
-            dto.setDateOfBirth(teacher.getDateOfBirth());
-            dto.setEmail(teacher.getEmail());
             dto.setFullName(teacher.getFullName());
-            dto.setSubjects(teacher.getSubjects());
-            dto.setMobile(teacher.getMobile());
             dto.setUsername(teacher.getUsername());
+            dto.setSubjects(teacher.getSubjects());
+            dto.setExperience(teacher.getExperience());
+            dto.setBio(teacher.getBio());
             dto.setProfileImageUrl(teacher.getProfileImageUrl());
+            // Note: email, mobile, and dateOfBirth are intentionally omitted
+            // to protect teacher privacy on public profile pages
             return ResponseEntity.ok(dto);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);

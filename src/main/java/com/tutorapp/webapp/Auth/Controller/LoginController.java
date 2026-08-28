@@ -76,11 +76,20 @@ public class LoginController {
     }
 }    @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(@RequestBody Map<String, String> request) {
-        String token = request.get("accessToken");
         Map<String, Object> response = new HashMap<>();
-        if (token != null && !token.isBlank()) {
-            tokenBlacklistService.blacklistToken(token);
+
+        // Blacklist access token
+        String accessToken = request.get("accessToken");
+        if (accessToken != null && !accessToken.isBlank()) {
+            tokenBlacklistService.blacklistToken(accessToken);
         }
+
+        // Blacklist refresh token so stolen refresh tokens can't be reused
+        String refreshToken = request.get("refreshToken");
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            tokenBlacklistService.blacklistToken(refreshToken);
+        }
+
         response.put("success", true);
         response.put("message", "Logged out successfully");
         return ResponseEntity.ok(response);
@@ -90,6 +99,12 @@ public class LoginController {
 public ResponseEntity<Map<String, Object>> refreshToken(@RequestBody Map<String, String> request) {
     String refreshToken = request.get("refreshToken");
     Map<String, Object> response = new HashMap<>();
+
+    // Check if refresh token has been blacklisted (e.g. after logout)
+    if (refreshToken != null && tokenBlacklistService.isBlacklisted(refreshToken)) {
+        response.put("error", "Refresh token has been revoked");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
 
     if (jwtUtil.validateToken(refreshToken)) {
         String username = jwtUtil.extractUsername(refreshToken);

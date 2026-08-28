@@ -93,10 +93,6 @@ public class GigData {
         this.bids = bids;
     }
 
-    public void setAcceptedStudentNames(List<String> studentNames) {
-
-    }
-
     public Double getRating() {
         return rating;
     }

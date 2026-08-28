@@ -1,6 +1,5 @@
 package com.tutorapp.webapp.Auth.Service;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -10,12 +9,13 @@ import com.tutorapp.webapp.User.Repository.UserInfoDao;
 @Service
 public class LoginService {
 
-    @Autowired
-    UserInfoDao userInfoDao;
+    private final UserInfoDao userInfoDao;
+    private final PasswordEncoder passwordEncoder;
 
-
-    @Autowired
-    PasswordEncoder passwordEncoder;
+    public LoginService(UserInfoDao userInfoDao, PasswordEncoder passwordEncoder) {
+        this.userInfoDao = userInfoDao;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     public UserInfo validateUser(String username, String password) {
         if (username == null || password == null) {
@@ -23,10 +23,10 @@ public class LoginService {
         }
 
         UserInfo user = userInfoDao.findByUsername(username).orElse(null);
-         if (user != null && passwordEncoder.matches(password, user.getPassword())) {
-            return user; // password matched
+        if (user != null && passwordEncoder.matches(password, user.getPassword())) {
+            return user;
         }
-        return null; // invalid credentials
+        return null;
     }
 
     public UserInfo getUserByUsername(String username) {

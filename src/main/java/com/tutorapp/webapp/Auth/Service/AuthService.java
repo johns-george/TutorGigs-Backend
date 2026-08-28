@@ -4,36 +4,36 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.tutorapp.webapp.Common.Exceptions.BadRequestException;
+import com.tutorapp.webapp.Common.Exceptions.ResourceNotFoundException;
 import com.tutorapp.webapp.Common.Services.EmailService;
 import com.tutorapp.webapp.User.Entity.UserInfo;
 import com.tutorapp.webapp.User.Repository.UserInfoDao;
 
-
 @Service
 public class AuthService {
 
-    @Autowired
-    private UserInfoDao userRepository;
-
-    @Autowired
-    private EmailService emailService;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private final UserInfoDao userRepository;
+    private final EmailService emailService;
+    private final PasswordEncoder passwordEncoder;
 
     @Value("${FRONTEND_URL:http://localhost:5173}")
     private String frontendUrl;
 
-    // Handle forgot password
+    public AuthService(UserInfoDao userRepository, EmailService emailService, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.emailService = emailService;
+        this.passwordEncoder = passwordEncoder;
+    }
+
     public String forgotPassword(String email) {
         Optional<UserInfo> optionalUser = userRepository.findByEmail(email);
         if (optionalUser.isEmpty()) {
-            throw new RuntimeException("No user found with this email");
+            throw new ResourceNotFoundException("No user found with this email");
         }
 
         UserInfo user = optionalUser.get();
@@ -50,16 +50,15 @@ public class AuthService {
         return "Password reset link sent to your email.";
     }
 
-    // Handle password reset (after clicking the link)
     public String resetPassword(String token, String newPassword) {
         Optional<UserInfo> optionalUser = userRepository.findByResetToken(token);
         if (optionalUser.isEmpty()) {
-            throw new RuntimeException("Invalid or expired reset token");
+            throw new BadRequestException("Invalid or expired reset token");
         }
 
         UserInfo user = optionalUser.get();
         if (user.getResetTokenExpiry() == null || user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Reset token has expired. Please request a new one.");
+            throw new BadRequestException("Reset token has expired. Please request a new one.");
         }
 
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -70,11 +69,10 @@ public class AuthService {
         return "Password reset successful.";
     }
 
-    // Handle forgot username
     public String forgotUsername(String email) {
         Optional<UserInfo> optionalUser = userRepository.findByEmail(email);
         if (optionalUser.isEmpty()) {
-            throw new RuntimeException("No user found with this email");
+            throw new ResourceNotFoundException("No user found with this email");
         }
 
         UserInfo user = optionalUser.get();

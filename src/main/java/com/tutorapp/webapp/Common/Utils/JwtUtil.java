@@ -38,14 +38,15 @@ public class JwtUtil {
 
     @PostConstruct
     public void init() {
-        if (jwtSecretEnv != null && !jwtSecretEnv.isBlank()) {
-            byte[] keyBytes = Decoders.BASE64.decode(jwtSecretEnv);
-            this.SECRET_KEY = Keys.hmacShaKeyFor(keyBytes);
-            log.info("JWT secret key loaded from environment variable");
-        } else {
-            log.warn("JWT_SECRET not set — using generated key. Tokens will not survive restarts.");
-            this.SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+        if (jwtSecretEnv == null || jwtSecretEnv.isBlank()) {
+            throw new IllegalStateException(
+                "JWT_SECRET environment variable is required but not set. " +
+                "Generate one with: openssl rand -base64 32"
+            );
         }
+        byte[] keyBytes = Decoders.BASE64.decode(jwtSecretEnv);
+        this.SECRET_KEY = Keys.hmacShaKeyFor(keyBytes);
+        log.info("JWT secret key loaded from environment variable");
     }
 
     // ✅ Generate Access Token

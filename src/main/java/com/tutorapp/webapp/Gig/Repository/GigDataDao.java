@@ -22,12 +22,16 @@ public interface GigDataDao extends JpaRepository<GigData, Long> {
     Page<GigData> findAllWithBids(Pageable pageable);
 
     @Query("SELECT g FROM GigData g WHERE " +
-           "(:subject IS NULL OR LOWER(g.subject) LIKE LOWER(CONCAT('%', :subject, '%'))) AND " +
+           "(:search IS NULL OR LOWER(g.subject) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(g.description) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(g.teacherUsername) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "(:subject IS NULL OR LOWER(g.subject) = LOWER(:subject)) AND " +
            "(:minGrade IS NULL OR g.grade >= :minGrade) AND " +
            "(:maxGrade IS NULL OR g.grade <= :maxGrade) AND " +
            "(:minAmount IS NULL OR g.amount >= :minAmount) AND " +
            "(:maxAmount IS NULL OR g.amount <= :maxAmount)")
-    Page<GigData> searchGigs(@Param("subject") String subject,
+    Page<GigData> searchGigs(@Param("search") String search,
+                              @Param("subject") String subject,
                               @Param("minGrade") Integer minGrade,
                               @Param("maxGrade") Integer maxGrade,
                               @Param("minAmount") Double minAmount,

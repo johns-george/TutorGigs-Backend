@@ -29,14 +29,13 @@ public class StudentDetailsController {
                     .orElseThrow(() -> new RuntimeException("Student not found"));
 
             UserDetailsDTO dto = new UserDetailsDTO();
-            dto.setBio(student.getBio());
-            dto.setDateOfBirth(student.getDateOfBirth());
-            dto.setEmail(student.getEmail());
             dto.setFullName(student.getFullName());
-            dto.setGrade(student.getGrade());
-            dto.setMobile(student.getMobile());
             dto.setUsername(student.getUsername());
+            dto.setGrade(student.getGrade());
+            dto.setBio(student.getBio());
             dto.setProfileImageUrl(student.getProfileImageUrl());
+            // Note: email, mobile, and dateOfBirth are intentionally omitted
+            // to protect student privacy on public profile pages
             return ResponseEntity.ok(dto);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
