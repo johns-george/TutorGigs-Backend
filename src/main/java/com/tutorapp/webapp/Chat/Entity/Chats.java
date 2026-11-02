@@ -7,6 +7,7 @@ import java.util.List;
 import com.tutorapp.webapp.Chat.Enum.ChatType;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -26,6 +27,9 @@ public class Chats {
     private ChatType type;
     private String name; // Only relevant for groups
     private LocalDateTime createdAt;
+
+    @Column(name = "last_sequence_number")
+    private Long lastSequenceNumber = 0L;
 
     @OneToMany(mappedBy = "chat", cascade = CascadeType.ALL)
     private List<Message> messages = new ArrayList<>();
@@ -81,6 +85,14 @@ public class Chats {
 
     public void setParticipants(List<ChatParticipant> participants) {
         this.participants = participants;
+    }
+
+    public Long getLastSequenceNumber() {
+        return lastSequenceNumber;
+    }
+
+    public void setLastSequenceNumber(Long lastSequenceNumber) {
+        this.lastSequenceNumber = lastSequenceNumber;
     }
 
 }

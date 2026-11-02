@@ -3,18 +3,21 @@ package com.tutorapp.webapp.Chat.Repository;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.tutorapp.webapp.Chat.Entity.Chats;
 
+import jakarta.persistence.LockModeType;
 
 @Repository
 public interface ChatDao extends JpaRepository<Chats, Long> {
 
-    // Optional<Chats> findBySenderIdAndReceiverId(Long senderId, Long receiverId);
-    // List<Chats> findBySenderIdOrReceiverId(Long senderId,Long receiverId);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM Chats c WHERE c.id = :id")
+    Optional<Chats> findByIdForUpdate(@Param("id") Long id);
 
      @Query("SELECT c FROM Chats c " +
            "JOIN c.participants p1 " +

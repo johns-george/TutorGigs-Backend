@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import com.tutorapp.webapp.User.Entity.UserInfo;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -26,6 +27,9 @@ public class Message {
     private UserInfo receiver;
     private String content;
     private LocalDateTime timestamp;
+
+    @Column(name = "sequence_number")
+    private Long sequenceNumber;
 
      @ManyToOne
     @JoinColumn(name = "chat_id", nullable = false)
@@ -79,6 +83,14 @@ public class Message {
 
     public void setReceiver(UserInfo receiver) {
         this.receiver = receiver;
+    }
+
+    public Long getSequenceNumber() {
+        return sequenceNumber;
+    }
+
+    public void setSequenceNumber(Long sequenceNumber) {
+        this.sequenceNumber = sequenceNumber;
     }
     
 }

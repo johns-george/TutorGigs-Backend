@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import com.tutorapp.webapp.Chat.DTO.ChatDTO;
@@ -16,12 +17,17 @@ import com.tutorapp.webapp.Chat.Entity.ChatParticipant;
 import com.tutorapp.webapp.Chat.Entity.Chats;
 import com.tutorapp.webapp.Chat.Entity.Message;
 import com.tutorapp.webapp.Chat.Enum.ChatType;
-import com.tutorapp.webapp.Chat.Redis.RedisPublisher;
+import com.tutorapp.webapp.Chat.Kafka.ChatKafkaPublisher;
+import com.tutorapp.webapp.Chat.Presence.PresenceRecord;
+import com.tutorapp.webapp.Chat.Presence.PresenceService;
+import com.tutorapp.webapp.Chat.Push.PushNotificationService;
 import com.tutorapp.webapp.Chat.Repository.ChatDao;
 import com.tutorapp.webapp.Chat.Repository.MessageDao;
 import com.tutorapp.webapp.Chat.Repository.ParticipantDao;
 import com.tutorapp.webapp.User.Entity.UserInfo;
 import com.tutorapp.webapp.User.Repository.UserInfoDao;
+
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ChatService {
@@ -30,7 +36,18 @@ public class ChatService {
 
     @Autowired(required = false)
     @Nullable
-    RedisPublisher redisPublisher;
+    ChatKafkaPublisher kafkaPublisher;
+
+    @Autowired(required = false)
+    @Nullable
+    PresenceService presenceService;
+
+    @Autowired
+    PushNotificationService pushNotificationService;
+
+    @Autowired(required = false)
+    @Nullable
+    SimpMessagingTemplate messagingTemplate;
 
     @Autowired
     MessageDao messageDao;
@@ -45,59 +62,109 @@ public class ChatService {
      ParticipantDao participantDao;
 
     public List<ChatMessageDTO> getMessages(Long chatId) {
-         return messageDao.findByChatIdOrderByTimestampAsc(chatId).stream()
-                .map(msg -> {
-                    ChatMessageDTO dto = new ChatMessageDTO();
-                    dto.setId(msg.getId());
-                    dto.setChatId(msg.getChat().getId());
-                    dto.setSenderId(msg.getSender().getId());
-                    dto.setSenderName(msg.getSender().getFullName()); // ✅ fixed
-                    dto.setReceiverId(
-                        participantDao.findByChatId(msg.getChat().getId()).stream()
-                            .filter(p -> !p.getUser().getId().equals(msg.getSender().getId()))
-                            .findFirst()
-                            .map(p -> p.getUser().getId())
-                            .orElse(null)
-                    );
-                    dto.setReceiverName(
-                        participantDao.findByChatId(msg.getChat().getId()).stream()
-                            .filter(p -> !p.getUser().getId().equals(msg.getSender().getId()))
-                            .findFirst()
-                            .map(p -> p.getUser().getFullName())
-                            .orElse(null)
-                    );
-                    dto.setContent(msg.getContent());
-                    dto.setSentAt(msg.getTimestamp().toString());
-                    return dto;
-                }).toList();
+        List<Message> messages = messageDao.findByChatIdOrderBySequenceNumberAsc(chatId);
+        if (messages == null || messages.isEmpty()) {
+            messages = messageDao.findByChatIdOrderByTimestampAsc(chatId);
+        }
+        return messages.stream().map(this::toDto).toList();
     }
 
+    public List<ChatMessageDTO> getMessagesAfterSequence(Long chatId, Long afterSeq) {
+        return messageDao.findByChatIdAndSequenceNumberGreaterThanOrderBySequenceNumberAsc(chatId, afterSeq).stream()
+                .map(this::toDto).toList();
+    }
+
+    /**
+     * Persist first, then hand off delivery:
+     *  Kafka on  → chat.message.created (keyed by chatId); router looks up Redis presence and
+     *              publishes to the recipient's websocket instance topic (or push).
+     *  Kafka off → local STOMP if the recipient is on this instance, else push.
+     */
+    @Transactional
     public ChatMessageDTO saveMessage(Long chatId, Long senderId, String content) {
-              Chats chat = chatDao.findById(chatId)
+        Chats chat = chatDao.findByIdForUpdate(chatId)
                 .orElseThrow(() -> new RuntimeException("Chat not found"));
 
         UserInfo sender = userInfoDao.findById(senderId)
                 .orElseThrow(() -> new RuntimeException("Sender not found"));
+
+        long currentLast = chat.getLastSequenceNumber() != null ? chat.getLastSequenceNumber() : 0L;
+        if (currentLast == 0L) {
+            Long maxSeq = messageDao.findMaxSequenceNumberByChatId(chatId);
+            if (maxSeq != null && maxSeq > 0) {
+                currentLast = maxSeq;
+            }
+        }
+        long nextSeq = currentLast + 1L;
+        chat.setLastSequenceNumber(nextSeq);
+        chatDao.save(chat);
 
         Message msg = new Message();
         msg.setChat(chat);
         msg.setSender(sender);
         msg.setContent(content);
         msg.setTimestamp(LocalDateTime.now());
+        msg.setSequenceNumber(nextSeq);
         messageDao.save(msg);
 
+        ChatMessageDTO dto = toDto(msg);
+        List<Long> recipientIds = participantDao.findByChatId(chatId).stream()
+                .map(p -> p.getUser().getId())
+                .toList();
+        try {
+            deliver(dto, recipientIds);
+        } catch (RuntimeException e) {
+            // A delivery failure must not roll back the message that was already saved.
+            log.error("Message {} in chat {} was saved but delivery failed", dto.getId(), chatId, e);
+        }
+        return dto;
+    }
+
+    private void deliver(ChatMessageDTO dto, List<Long> recipientIds) {
+        if (kafkaPublisher != null) {
+            kafkaPublisher.publishCreated(dto, recipientIds);
+            return;
+        }
+        boolean sentToLocalBroker = false;
+        for (Long recipientId : recipientIds) {
+            PresenceRecord presence = presenceService != null
+                    ? presenceService.find(recipientId).orElse(null)
+                    : null;
+            if (presence != null && presenceService.isLocal(presence) && messagingTemplate != null) {
+                if (!sentToLocalBroker) {
+                    messagingTemplate.convertAndSend("/topic/chat/" + dto.getChatId(), dto);
+                    sentToLocalBroker = true;
+                }
+            } else if (presence == null) {
+                if (presenceService == null && messagingTemplate != null && !sentToLocalBroker) {
+                    messagingTemplate.convertAndSend("/topic/chat/" + dto.getChatId(), dto);
+                    sentToLocalBroker = true;
+                } else {
+                    pushNotificationService.notifyOfflineUser(recipientId, dto);
+                }
+            }
+        }
+    }
+
+    private ChatMessageDTO toDto(Message msg) {
         ChatMessageDTO dto = new ChatMessageDTO();
         dto.setId(msg.getId());
-        dto.setChatId(chat.getId());
-        dto.setSenderId(sender.getId());
-        dto.setSenderName(sender.getFullName());
+        dto.setChatId(msg.getChat().getId());
+        dto.setSenderId(msg.getSender().getId());
+        dto.setSenderName(msg.getSender().getFullName());
+        dto.setSequenceNumber(msg.getSequenceNumber());
+
+        // Other participant (for private chats; null for groups)
+        participantDao.findByChatId(msg.getChat().getId()).stream()
+                .filter(p -> !p.getUser().getId().equals(msg.getSender().getId()))
+                .findFirst()
+                .ifPresent(p -> {
+                    dto.setReceiverId(p.getUser().getId());
+                    dto.setReceiverName(p.getUser().getFullName());
+                });
+
         dto.setContent(msg.getContent());
         dto.setSentAt(msg.getTimestamp().toString());
-
-         if (redisPublisher != null) {
-            redisPublisher.publish(dto);
-        }
-
         return dto;
     }
 
@@ -136,7 +203,7 @@ public class ChatService {
 
      // 🔹 Start private chat
     public ChatDTO getOrCreatePrivateChat(Long user1Id, Long user2Id) {
-        
+
         Chats existing = chatDao.findPrivateChatBetweenUsers(user1Id, user2Id)
                 .orElse(null);
 

@@ -34,10 +34,15 @@ class ChatController {
     UserInfoDao userInfoDao;
 
     @GetMapping("/{chatId}/messages")
-    public ResponseEntity<?> getMessages(@PathVariable Long chatId, Authentication authentication) {
+    public ResponseEntity<?> getMessages(@PathVariable Long chatId,
+                                         @RequestParam(required = false) Long afterSeq,
+                                         Authentication authentication) {
         try {
             if (authentication == null || !authentication.isAuthenticated()) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            if (afterSeq != null) {
+                return ResponseEntity.ok(chatService.getMessagesAfterSequence(chatId, afterSeq));
             }
             return ResponseEntity.ok(chatService.getMessages(chatId));
         } catch (Exception e) {

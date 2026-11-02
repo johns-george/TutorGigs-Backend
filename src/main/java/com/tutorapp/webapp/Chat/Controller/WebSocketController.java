@@ -1,42 +1,43 @@
 package com.tutorapp.webapp.Chat.Controller;
 
+import java.security.Principal;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 import com.tutorapp.webapp.Chat.DTO.ChatMessageDTO;
-import com.tutorapp.webapp.Chat.Service.MessageService;
-
-
+import com.tutorapp.webapp.Chat.Presence.PresenceService;
+import com.tutorapp.webapp.Chat.Service.ChatService;
+import com.tutorapp.webapp.User.Entity.UserInfo;
+import com.tutorapp.webapp.User.Repository.UserInfoDao;
 
 @Controller
 public class WebSocketController {
-@Autowired
-MessageService messageService;
 
+    @Autowired
+    ChatService chatService;
 
+    @Autowired
+    UserInfoDao userInfoDao;
 
-@Autowired
-SimpMessagingTemplate messagingTemplate;
-@MessageMapping("/chat.sendMessage")
-public void sendMessage(ChatMessageDTO messageDTO) {
-    // Save message to DB
-     var savedMessage = messageService.saveMessage(
-        messageDTO.getChatId(),
-        messageDTO.getSenderId(),
-       // messageDTO.getReceiverId(),
-        messageDTO.getContent()
-    );    
-            ChatMessageDTO response = new ChatMessageDTO();
-            response.setId(savedMessage.getId());
-            response.setChatId(savedMessage.getChat().getId());
-            response.setSenderId(savedMessage.getSender().getId());
-            response.setSenderName(savedMessage.getSender().getFullName());
-            //response.setReceiverId(savedMessage.getReceiver().getId());
-            response.setContent(savedMessage.getContent());
-            response.setSentAt(savedMessage.getTimestamp().toString());
-    // Broadcast to subscribers
-    messagingTemplate.convertAndSend("/topic/chat/" + messageDTO.getChatId(), response);
-}
+    @Autowired(required = false)
+    @Nullable
+    PresenceService presenceService;
+
+    @MessageMapping("/chat.sendMessage")
+    public void sendMessage(ChatMessageDTO messageDTO) {
+        chatService.saveMessage(messageDTO.getChatId(), messageDTO.getSenderId(), messageDTO.getContent());
+    }
+
+    @MessageMapping("/chat.ping")
+    public void ping(Principal principal) {
+        if (principal == null || presenceService == null) {
+            return;
+        }
+        userInfoDao.findByUsername(principal.getName())
+                .map(UserInfo::getId)
+                .ifPresent(presenceService::refresh);
+    }
 }

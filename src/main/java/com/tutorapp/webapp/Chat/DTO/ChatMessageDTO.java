@@ -2,22 +2,23 @@ package com.tutorapp.webapp.Chat.DTO;
 
 
 public class ChatMessageDTO {
-public Long Id;
-private Long chatId;
-private Long senderId;
-public Long receiverId;
-private String receiverName;
-private String senderName;
-private String content;
-private String sentAt;
+    private Long id;
+    private Long chatId;
+    private Long senderId;
+    private Long receiverId;
+    private String receiverName;
+    private String senderName;
+    private String content;
+    private String sentAt;
+    private Long sequenceNumber;
 
-public Long getId() {
-     return Id; 
+    public Long getId() {
+        return id;
     }
 
     public void setId(Long id) {
-         this.Id = id; 
-        }
+        this.id = id;
+    }
 
     public Long getChatId() {
         return chatId;
@@ -49,6 +50,14 @@ public Long getId() {
 
     public void setSentAt(String sentAt) {
         this.sentAt = sentAt;
+    }
+
+    public Long getSequenceNumber() {
+        return sequenceNumber;
+    }
+
+    public void setSequenceNumber(Long sequenceNumber) {
+        this.sequenceNumber = sequenceNumber;
     }
 
     public Long getReceiverId() {

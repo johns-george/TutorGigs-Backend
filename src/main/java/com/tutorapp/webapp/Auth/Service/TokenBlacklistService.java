@@ -1,20 +1,8 @@
 package com.tutorapp.webapp.Auth.Service;
 
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+public interface TokenBlacklistService {
 
-import org.springframework.stereotype.Service;
+    void blacklistToken(String token);
 
-@Service
-public class TokenBlacklistService {
-
-    private final Set<String> blacklistedTokens = ConcurrentHashMap.newKeySet();
-
-    public void blacklistToken(String token) {
-        blacklistedTokens.add(token);
-    }
-
-    public boolean isBlacklisted(String token) {
-        return blacklistedTokens.contains(token);
-    }
+    boolean isBlacklisted(String token);
 }
